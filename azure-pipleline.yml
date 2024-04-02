@@ -1,0 +1,77 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+variables :
+ environment: "Azure subscription 1 (18c11da9-b6b9-4cc4-a3af-ebc2e64ad324)"
+
+trigger:
+- main
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'windows-latest'
+    steps: 
+    - task: CopyFiles@2
+      inputs:
+        Contents: '**'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+    - task: TerraformInstaller@1
+      displayName: 'TerraformInstall'
+      
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: '$(environment)'
+        backendAzureRmResourceGroupName: 'T3000'
+        backendAzureRmStorageAccountName: 'istor3000'
+        backendAzureRmContainerName: 'istorcontainer'
+        backendAzureRmKey: 'terraform.tfstate'
+        
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform validate' 
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform fmt'
+      inputs:
+        provider: 'azurerm'
+        command: 'custom'
+        customCommand: 'fmt'
+        outputTo: 'console'
+        environmentServiceNameAzureRM: '$(environment)'
+    
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        environmentServiceNameAzureRM: '$(environment)'
+    
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        environmentServiceNameAzureRM: '$(environment)'
+
+
+   
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
+    displayName: 'Terraform : Destroy'
+    inputs:
+    command: destroy
+    workingDirectory: '$(System.DefaultWorkingDirectory)/_Packero/drop'
+    environmentServiceNameAzureRM: 'Azure subscription 1 (18c11da9-b6b9-4cc4-a3af-ebc2e64ad324)'
